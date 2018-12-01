@@ -131,7 +131,7 @@ const addressStyle = new Style({
 
 const networkStyle = new Style({
   stroke: new Stroke({
-    color: '#ffcc33',
+    color: 'rgb(187, 41, 187)',
     width: 5
   }),
   text: new Text({
@@ -159,6 +159,9 @@ const startPointStyle = new Style({
     }),
   }),
 });
+
+let firstBuildingsPromise = null;
+let firstBuildings = new Promise((resolve) => firstBuildingsPromise = resolve);
 
 const fetchBuildings = (event) => {
   const map = event.map;
@@ -189,6 +192,10 @@ const fetchBuildings = (event) => {
     const features = new GeoJSON().readFeatures(json);
     buildingVectorSource.clear();
     buildingVectorSource.addFeatures(features);
+
+    if (firstBuildingsPromise) {
+      firstBuildingsPromise(features);
+    }
   });
 };
 
@@ -293,7 +300,6 @@ const mapLayer = new Tile({
       STYLES: 'raster'
     },
     projection,
-    serverType: 'geoserver',
     transition: 0
   })
 });
@@ -310,7 +316,7 @@ const initMap = () => {
     ],
     view: new View({
       center: center,
-      zoom: 15,
+      zoom: 12,
       projection
     }),
     projection,
@@ -339,7 +345,15 @@ const initMap = () => {
 
   return {
     map,
-    getBuildings: () => buildingVectorSource.getFeatures(),
+    getBuildings: () => {
+      if (firstBuildings) {
+        const result = firstBuildings;
+        firstBuildings = null;
+        return result;
+      } else {
+        return Promise.resolve(buildingVectorSource.getFeatures());
+      }
+    },
     drawNetwork: edges => {
       const features = edges.map(edge => new Feature({
         geometry: edge
@@ -352,7 +366,7 @@ const initMap = () => {
       startPointVectorSource.clear();
       map.addInteraction(draw);
     },
-    getStartingPoint: () => startPointVectorSource.getFeatures()[0]
+    getStartingPoint: () => Promise.resolve(startPointVectorSource.getFeatures()[0])
   }
 };
 
