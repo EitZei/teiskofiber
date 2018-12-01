@@ -3,8 +3,12 @@ import View from 'ol/View';
 import Feature from 'ol/Feature';
 import {
   Draw,
-  Select
+  Select,
+  defaults as DefaultInteractions
 } from 'ol/interaction';
+import {
+  defaults as DefaultControls
+} from 'ol/control';
 import {
   Point
 } from 'ol/geom';
@@ -305,6 +309,14 @@ const mapLayer = new Tile({
 });
 
 const initMap = () => {
+  var controls = DefaultControls({
+    rotate: false
+  });
+  var interactions = DefaultInteractions({
+    altShiftDragRotate: false,
+    pinchRotate: false
+  });
+
   const map = new Map({
     target: 'map',
     layers: [
@@ -321,6 +333,8 @@ const initMap = () => {
     }),
     projection,
     maxBounds: bounds,
+    controls,
+    interactions
   });
 
   map.on("moveend", fetchBuildings);
