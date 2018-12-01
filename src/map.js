@@ -181,6 +181,7 @@ const fetchBuildings = (event) => {
   // then post the request and add the received features to a layer
   fetch(geoserverUrl, {
     method: 'POST',
+    mode: 'cors',
     body: new XMLSerializer().serializeToString(featureRequest)
   }).then(function (response) {
     return response.json();
@@ -212,6 +213,7 @@ const fetchAddresses = (event) => {
   // then post the request and add the received features to a layer
   fetch(geoserverUrl, {
     method: 'POST',
+    mode: 'cors',
     body: new XMLSerializer().serializeToString(featureRequest)
   }).then(function (response) {
     return response.json();
