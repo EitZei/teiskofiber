@@ -54,7 +54,7 @@ const projection = new Projection({
   extent: [-3669433.90, 4601644.86, 648181.26, 9364104.12]
 });
 
-const bounds = [325960, 6825810, 349183.9375, 6860800.0625];
+const bounds = [327571, 6825810, 349183.9375, 6860800.0625];
 const center = [336141, 6845570];
 
 const TYPE_NAMES = {
