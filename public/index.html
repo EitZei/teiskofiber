@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <link rel="stylesheet" href="https://cdn.rawgit.com/openlayers/openlayers.github.io/master/en/v5.3.0/css/ol.css" type="text/css" />
+  <link rel="stylesheet" href="style.css" type="text/css" />
+  <script src="bundle.js"></script>
+
+  <title>Tampereen pohjoisen suuralueen laajakaistahanke</title>
+</head>
+
+<body>
+  <div id="map" class="map"></div>
+
+  <div id="parameters">
+    <table>
+      <tr>
+        <th><label for="targetDensity">Tavoite liittyjiä per km:</label></th>
+        <td><input type="number" value="10" id="targetDensity" /> liit/km</td>
+      </tr>
+      <tr />
+      <tr>
+        <th>Kiinteistöjen määrä:</th>
+        <td><input type="text" disabled value="Laskettu..." id="propertyCount" /> kpl</td>
+      </tr>
+      <tr>
+        <th>Kokonaispituus:</th>
+        <td><input type="text" disabled value="Laskettu..." id="totalLength" /> m</td>
+      </tr>
+      <tr>
+        <th>Pituus per asukas:</th>
+        <td><input type="text" disabled value="Laskettu..." id="lengthPerProperty" /> m</td>
+      </tr>
+      <tr>
+        <th>Toteutunut liittyjiä per km:</th>
+        <td><input type="text" disabled value="Laskettu..." id="actualDensity" /> liit/km</td>
+      </tr>
+      <tr>
+        <th><label for="animate">Animoi:</label></th>
+        <td><input type="checkbox" id="animate" /></td>
+      </tr>
+    </table>
+
+    <button id="calculate">Laske</button>
+    <button id="setStartingPoint">Aseta aloituspiste</button>
+    <span id="status"></span>
+  </div>
+</body>
+
+</html>

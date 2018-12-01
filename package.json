@@ -1,0 +1,23 @@
+{
+  "name": "teiskofiber",
+  "version": "1.0.0",
+  "description": "Tampereen pohjoisen suuralueen laajakaistahanke",
+  "main": "src/main.js",
+  "scripts": {
+    "watch": "webpack --watch --mode=development",
+    "dist": "webpack --mode=production"
+  },
+  "author": "Antti Järvinen <antti.jarvinen@alupark.fi>",
+  "license": "MIT",
+  "devDependencies": {
+    "@babel/core": "^7.1.6",
+    "@babel/preset-env": "^7.1.6",
+    "babel-core": "^6.26.3",
+    "babel-loader": "^8.0.4",
+    "babel-polyfill": "^6.26.0"
+  },
+  "dependencies": {
+    "ol": "^5.3.0",
+    "proj4": "^2.5.0"
+  }
+}
