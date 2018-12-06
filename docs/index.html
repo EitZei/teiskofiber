@@ -18,33 +18,19 @@
     <table>
       <tr>
         <th><label for="targetDensity">Tavoite liittyjiä per km:</label></th>
-        <td><input type="number" value="10" id="targetDensity" /> liit/km</td>
-      </tr>
-      <tr />
-      <tr>
-        <th>Liittyjien määrä:</th>
-        <td><input type="text" disabled value="Laskettu..." id="propertyCount" /> kpl</td>
+        <td><input type="number" value="15" id="targetDensity" /> liit/km</td>
       </tr>
       <tr>
-        <th>Kokonaispituus:</th>
-        <td><input type="text" disabled value="Laskettu..." id="totalLength" /> m</td>
+        <th><label for="targetDensity">Minimiliittyjämäärä:</label></th>
+        <td><input type="number" value="50" id="targetNoApartments" /> kpl</td>
       </tr>
       <tr>
-        <th>Pituus per liittyjä:</th>
-        <td><input type="text" disabled value="Laskettu..." id="lengthPerProperty" /> m</td>
-      </tr>
-      <tr>
-        <th>Toteutunut liittyjiä per km:</th>
-        <td><input type="text" disabled value="Laskettu..." id="actualDensity" /> liit/km</td>
-      </tr>
-      <tr>
-        <th><label for="animate">Animoi:</label></th>
-        <td><input type="checkbox" id="animate" /></td>
+        <th><label for="targetDensity">Maksimi vedon pituus:</label></th>
+        <td><input type="number" value="1000" id="maxLineLength" /> m</td>
       </tr>
     </table>
 
     <button id="calculate">Laske</button>
-    <button id="setStartingPoint">Aseta aloituspiste</button>
     <span id="status"></span>
   </div>
 </body>

@@ -2,7 +2,6 @@ import Map from 'ol/Map';
 import View from 'ol/View';
 import Feature from 'ol/Feature';
 import {
-  Draw,
   Select,
   defaults as DefaultInteractions
 } from 'ol/interaction';
@@ -10,7 +9,7 @@ import {
   defaults as DefaultControls
 } from 'ol/control';
 import {
-  Point
+  Polygon
 } from 'ol/geom';
 import {
   Style,
@@ -33,6 +32,7 @@ import {
 import Projection from 'ol/proj/Projection';
 import {
   Vector as VectorSource,
+  Cluster,
   TileWMS
 } from 'ol/source';
 import {
@@ -46,6 +46,9 @@ import {
   register
 } from 'ol/proj/proj4';
 import proj4 from 'proj4';
+import {
+  convexHull
+} from './geo-utils';
 
 const srs = "EPSG:3067";
 const geoserverUrl = 'http://opendata.navici.com/tampere/ows';
@@ -89,6 +92,25 @@ const buildingStyle = {
         fill: new Fill({
           color: 'rgb(255,0,0)',
         }),
+        stroke: new Stroke({
+          color: '#fff',
+          width: 3
+        })
+      })
+    }),
+    'cluster': new Style({
+      image: new Circle({
+        fill: new Fill({
+          color: 'rgb(255,0,0)'
+        }),
+        radius: 8,
+        stroke: new Stroke({
+          color: '#000000',
+          width: 1
+        }),
+      }),
+      text: new Text({
+        font: '1vh Calibri,sans-serif',
         stroke: new Stroke({
           color: '#fff',
           width: 3
@@ -150,26 +172,20 @@ const networkStyle = new Style({
   })
 });
 
-
-const startPointStyle = new Style({
-  image: new Circle({
-    fill: new Fill({
-      color: 'rgb(0,0,255)'
-    }),
-    radius: 5,
-    stroke: new Stroke({
-      color: 'rgb(255,255,255)',
-      width: 1
-    }),
+const boundingStyle = new Style({
+  stroke: new Stroke({
+    color: 'rgb(255, 255, 0)',
+    width: 1
   }),
+  fill: new Fill({
+    color: 'rgba(255, 255, 0, 0.2)'
+  })
 });
 
-let firstBuildingsPromise = null;
-let firstBuildings = new Promise((resolve) => firstBuildingsPromise = resolve);
+let buildingsPromiseResolve = null;
+const buildings = new Promise((resolve) => buildingsPromiseResolve = resolve);
 
-const fetchBuildings = (event) => {
-  const map = event.map;
-
+const fetchBuildings = () => {
   const INTERESTING_TYPES = ['041', '011', '021', '012', '039', '032', '013'];
 
   const filters = INTERESTING_TYPES.map(type => equalTo('KAYTTOTARKOITUS', type));
@@ -181,26 +197,25 @@ const fetchBuildings = (event) => {
     featureTypes: ['RAKENNUKSET_MVIEW'],
     outputFormat: 'application/json',
     geometryName: 'GEOLOC',
-    bbox: getIntersection(bounds, map.getView().calculateExtent()),
+    bbox: bounds,
     filter: or.apply(null, filters)
   });
 
   // then post the request and add the received features to a layer
   fetch(geoserverUrl, {
-    method: 'POST',
-    mode: 'cors',
-    body: new XMLSerializer().serializeToString(featureRequest)
-  }).then(function (response) {
-    return response.json();
-  }).then(function (json) {
-    const features = new GeoJSON().readFeatures(json);
-    buildingVectorSource.clear();
-    buildingVectorSource.addFeatures(features);
+      method: 'POST',
+      mode: 'cors',
+      body: new XMLSerializer().serializeToString(featureRequest)
+    })
+    .then(response => response.json())
+    .then(json => {
+      const features = new GeoJSON().readFeatures(json);
+      buildingVectorSource.clear();
+      buildingVectorSource.addFeatures(features);
 
-    if (firstBuildingsPromise) {
-      firstBuildingsPromise(features);
-    }
-  });
+      return features;
+    })
+    .then(buildingsPromiseResolve);
 };
 
 const fetchAddresses = (event) => {
@@ -237,11 +252,11 @@ const fetchAddresses = (event) => {
 
 const featureSelected = event => {
   event.selected.forEach(feature => {
-    const type = feature.getProperties()['KAYTTOTARKOITUS'];
-    const noApartments = feature.getProperties()['HUONEISTOJA_KPL'] || 1;
+    const type = feature.get('features')[0].getProperties()['KAYTTOTARKOITUS'];
+    const noApartments = feature.get('features')[0].getProperties()['HUONEISTOJA_KPL'] || 1;
 
-    const specificStyle = buildingStyle[feature.getGeometry().getType()][type];
-    const style = specificStyle || buildingStyle[feature.getGeometry().getType()].default;
+    const specificStyle = buildingStyle[feature.get('features')[0].getGeometry().getType()][type];
+    const style = specificStyle || buildingStyle[feature.get('features')[0].getGeometry().getType()].default;
     const featureStyle = style.clone()
 
     const text = `${TYPE_NAMES[type]}: ${noApartments} huoneistoa`;
@@ -255,12 +270,26 @@ const featureSelected = event => {
 };
 
 const buildingVectorSource = new VectorSource();
-const buildingVectorLayer = new VectorLayer({
+
+const buildingClusterSource = new Cluster({
   source: buildingVectorSource,
+  distance: 20
+});
+
+const buildingVectorLayer = new VectorLayer({
+  source: buildingClusterSource,
   style: (feature) => {
-    const specificStyle = buildingStyle[feature.getGeometry().getType()][feature.getProperties()[
-      'KAYTTOTARKOITUS']];
-    return specificStyle || buildingStyle[feature.getGeometry().getType()].default;
+    const size = feature.get('features').length;
+
+    if (size === 1) {
+      const specificStyle = buildingStyle[feature.get('features')[0].getGeometry().getType()][feature.get('features')[0].getProperties()[
+        'KAYTTOTARKOITUS']];
+      return specificStyle || buildingStyle[feature.get('features')[0].getGeometry().getType()].default;
+    } else {
+      const style = buildingStyle[feature.getGeometry().getType()].cluster;
+      style.getText().setText(size.toString());
+      return style;
+    }
   }
 });
 
@@ -280,17 +309,17 @@ const networkVectorSource = new VectorSource();
 const networkVectorLayer = new VectorLayer({
   source: networkVectorSource,
   style: (feature) => {
-    const length = Math.ceil(feature.getGeometry().getLength());
-    networkStyle.getText().setText(`${length} m`);
+    //const length = Math.ceil(feature.getGeometry().getLength());
+    //networkStyle.getText().setText(`${length} m`);
 
     return networkStyle;
   }
 });
 
-const startPointVectorSource = new VectorSource();
-const startPointVectorLayer = new VectorLayer({
-  source: startPointVectorSource,
-  style: startPointStyle
+const boundingVectorSource = new VectorSource();
+const boundingVectorLayer = new VectorLayer({
+  source: boundingVectorSource,
+  style: boundingStyle,
 });
 
 const mapLayer = new Tile({
@@ -321,10 +350,10 @@ const initMap = () => {
     target: 'map',
     layers: [
       mapLayer,
+      boundingVectorLayer,
       networkVectorLayer,
       buildingVectorLayer,
-      addressVectorLayer,
-      startPointVectorLayer
+      addressVectorLayer
     ],
     view: new View({
       center: center,
@@ -337,8 +366,12 @@ const initMap = () => {
     interactions
   });
 
-  map.on("moveend", fetchBuildings);
   map.on("moveend", fetchAddresses);
+  map.on("moveend", event => {
+    const clusterDistance = (map.getView().getZoom() < 12) ? 20 : 0;
+
+    buildingClusterSource.setDistance(clusterDistance);
+  })
 
   const select = new Select({
     condition: pointerMove,
@@ -347,40 +380,34 @@ const initMap = () => {
   map.addInteraction(select);
   select.on('select', featureSelected);
 
-  const draw = new Draw({
-    source: startPointVectorSource,
-    type: 'Point'
-  });
-  draw.on('drawend', () => map.removeInteraction(draw))
-
-  startPointVectorSource.addFeatures([new Feature({
-    geometry: new Point(center)
-  })]);
+  map.once('postrender', () => fetchBuildings());
 
   return {
     map,
-    getBuildings: () => {
-      if (firstBuildings) {
-        const result = firstBuildings;
-        firstBuildings = null;
-        return result;
-      } else {
-        return Promise.resolve(buildingVectorSource.getFeatures());
-      }
-    },
-    drawNetwork: edges => {
-      const features = edges.map(edge => new Feature({
+    getBuildings: () => buildings,
+    drawNetwork: trees => {
+      networkVectorSource.clear();
+      boundingVectorSource.clear();
+
+      let allEdges = [];
+      const polygons = [];
+
+      trees.forEach(tree => {
+        allEdges = allEdges.concat(tree.edges);
+
+        const coordinates = tree.buildings.map(building => building.geometry.getFirstCoordinate());
+        const boundingCoordinates = convexHull(coordinates);
+        const boundingPolygon = new Polygon([boundingCoordinates]);
+        polygons.push(new Feature(boundingPolygon));
+      });
+
+      const features = allEdges.map(edge => new Feature({
         geometry: edge
       }));
 
-      networkVectorSource.clear();
       networkVectorSource.addFeatures(features);
-    },
-    setStartingPoint: () => {
-      startPointVectorSource.clear();
-      map.addInteraction(draw);
-    },
-    getStartingPoint: () => Promise.resolve(startPointVectorSource.getFeatures()[0])
+      boundingVectorSource.addFeatures(polygons);
+    }
   }
 };
 

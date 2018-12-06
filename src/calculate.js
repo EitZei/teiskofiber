@@ -3,107 +3,120 @@ import {
   LineString
 } from 'ol/geom.js';
 
+let buildingId = 0;
 const transformBuildings = features => features.map(feature => ({
+  id: buildingId++,
   noApartments: feature.getProperties()['HUONEISTOJA_KPL'] || 1,
   geometry: feature.getGeometry()
 }));
 
 const line = (a, b) => new LineString([a.geometry.getFirstCoordinate(), b.geometry.getFirstCoordinate()]);
 
-const distance = (a, b) =>
-  line(a, b).getLength();
+const weight = (l) => l.getLength();
 
-const weight = distance;
-
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-const heapItem = (item, to, weight) => ({
-  item,
-  to,
-  weight
-});
+const density = (length, noApartments) => noApartments / (length / 1000);
 
 export const calculate = async ({
-  buildings,
-  startingPoint,
+  buildings: inputBuildings,
   targetDensity,
-  progress,
-  animateMs,
+  targetNoApartments,
+  maxLineLength,
+  progress
 }) => {
-  const startPoint = {
-    noApartments: 0,
-    geometry: startingPoint.getGeometry()
-  };
+  const buildings = transformBuildings(inputBuildings);
 
-  const remainingBuildings = transformBuildings(buildings);
+  const edgeHeap = new Heap((a, b) => a.weight - b.weight);
 
-  const heapItems = remainingBuildings
-    .map(building => heapItem(building, startPoint, weight(startPoint, building)));
+  for (var i = 0; i < buildings.length; i++) {
+    for (var j = i; j < buildings.length; j++) {
+      if (buildings[i] !== buildings[j]) {
+        const l = line(buildings[i], buildings[j])
+        const w = weight(l);
 
-  const heap = new Heap((a, b) => a.weight - b.weight);
-  heapItems.forEach(item => heap.push(item));
-
-  const edges = [];
-
-  let totalLength = 0;
-  let numberOfApartments = 0;
-
-  while (heap.size() > 0) {
-    const toBeAdded = heap.pop();
-
-    const edge = line(toBeAdded.to, toBeAdded.item);
-
-    const newTotalLength = totalLength + edge.getLength();
-    const newNumberOfApartments = numberOfApartments + toBeAdded.item.noApartments;
-
-    const wouldBeDensity = newNumberOfApartments / (newTotalLength / 1000);
-
-    if (typeof progress === 'function') {
-      progress({
-        total: buildings.length,
-        remaining: heap.size(),
-        edges,
-      });
-    }
-
-    // If we are not achieving the density then just continue
-    if (wouldBeDensity < targetDensity) {
-      continue
-    };
-
-    edges.push(edge);
-
-    totalLength = newTotalLength;
-    numberOfApartments = newNumberOfApartments;
-
-    // Rearrange heap
-    let changed = false;
-    heap.toArray().forEach(itemInHeap => {
-      const weightWithToBeAdded = weight(toBeAdded.item, itemInHeap.item);
-
-      if (weightWithToBeAdded < itemInHeap.weight) {
-        changed = true;
-        itemInHeap.to = toBeAdded.item;
-        itemInHeap.weight = weightWithToBeAdded;
+        if (w <= maxLineLength) {
+          edgeHeap.push({
+            from: buildings[i],
+            to: buildings[j],
+            line: l,
+            weight: w
+          });
+        }
       }
-    });
-
-    if (changed) {
-      heap.heapify();
-    }
-
-    if (animateMs) {
-      await sleep(animateMs);
     }
   }
 
+  const treeIndex = [];
+
+  for (var i = 0; i < buildings.length; i++) {
+    const tree = {
+      id: i,
+      totalLength: 0,
+      noApartments: buildings[i].noApartments,
+      edges: [],
+      buildings: [buildings[i]],
+    }
+
+    treeIndex[buildings[i].id] = tree;
+  }
+
+  console.log("Buildings", buildings.length, "Edges", edgeHeap.size(), "Index", treeIndex.length);
+
+  const totalEdgeCount = edgeHeap.size();
+  while (edgeHeap.size() > 0) {
+    const shortestEdge = edgeHeap.pop();
+
+    const fromTree = treeIndex[shortestEdge.from.id];
+    const toTree = treeIndex[shortestEdge.to.id];
+
+    if (fromTree === toTree) {
+      continue;
+    }
+
+    const lineBetween = shortestEdge.line;
+
+    const wouldBeTotalLength = fromTree.totalLength + toTree.totalLength + lineBetween.getLength();
+    const wouldBeNoApartments = fromTree.noApartments + toTree.noApartments;
+    const wouldBeDensity = density(wouldBeTotalLength, wouldBeNoApartments);
+
+    if (typeof progress === 'function') {
+      if (edgeHeap.size() % 100 === 0) {
+        progress({
+          total: totalEdgeCount,
+          remaining: edgeHeap.size()
+        });
+      }
+    }
+
+    // Discard edges as it cannot form a dense enough tree
+    if (wouldBeDensity < targetDensity) {
+      continue;
+    }
+
+    fromTree.totalLength = wouldBeTotalLength;
+    fromTree.noApartments = wouldBeNoApartments;
+    fromTree.edges.push(lineBetween);
+    fromTree.edges = fromTree.edges.concat(toTree.edges);
+    fromTree.buildings = fromTree.buildings.concat(toTree.buildings)
+
+    toTree.buildings.forEach(building => {
+      treeIndex[building.id] = fromTree;
+    })
+  }
+
+  const trees = [];
+  treeIndex.forEach(tree => {
+    if (trees.indexOf(tree) < 0) {
+      trees.push(tree);
+    }
+  })
+
+  const filteredTrees = trees.filter(tree => tree.noApartments >= targetNoApartments);
+
   return {
-    edges,
-    propertyCount: numberOfApartments,
-    totalLength: totalLength,
-    lengthPerProperty: totalLength / numberOfApartments,
-    actualDensity: numberOfApartments / (totalLength / 1000)
+    trees: filteredTrees,
+    propertyCount: 0,
+    totalLength: 0,
+    lengthPerProperty: 0,
+    actualDensity: 0
   }
 }
