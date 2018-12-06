@@ -17,9 +17,9 @@ const handleCalculation = map => async () => {
     targetDensity,
     targetNoApartments,
     maxLineLength,
-    progress: (state) => {
+    progress: statePromise => statePromise.then(state => {
       statusLabel.innerHTML = `${state.remaining} / ${state.total}`;
-    }
+    })
   });
 
   statusLabel.innerHTML = ''
