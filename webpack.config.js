@@ -26,8 +26,6 @@ module.exports = {
   },
   devtool: 'source-map',
   plugins: [
-    new CleanWebpackPlugin(['docs/*.js', 'docs/*.js.map'], {
-      watch: true
-    })
+    new CleanWebpackPlugin(['docs/*.js', 'docs/*.js.map'], {})
   ]
 };

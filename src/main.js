@@ -18,6 +18,8 @@ const handleCalculation = map => async () => {
 
   const statusLabel = document.getElementById('status');
 
+  statusLabel.innerHTML = "Ladataan rakennuksia...";
+
   const buildings = await map.getBuildings();
 
   const calculator = new Calculator();

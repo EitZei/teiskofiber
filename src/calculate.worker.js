@@ -65,11 +65,13 @@ const mst = async (edgeHeap, treeIndex, targetDensity) => {
     const wouldBeNoApartments = fromTree.noApartments + toTree.noApartments;
     const wouldBeDensity = density(wouldBeTotalLength, wouldBeNoApartments);
 
-    self.postMessage({
-      status: 'progress',
-      total: totalEdgeCount,
-      remaining: edgeHeap.size()
-    });
+    if (edgeHeap.size() % 1000 === 0) {
+      self.postMessage({
+        status: 'progress',
+        total: totalEdgeCount,
+        remaining: edgeHeap.size()
+      });
+    }
 
     // Discard edges as it cannot form a dense enough tree
     if (wouldBeDensity < targetDensity) {
