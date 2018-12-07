@@ -9,7 +9,8 @@ import {
   defaults as DefaultControls
 } from 'ol/control';
 import {
-  Polygon
+  Polygon,
+  LineString
 } from 'ol/geom';
 import {
   Style,
@@ -395,14 +396,14 @@ const initMap = () => {
       trees.forEach(tree => {
         allEdges = allEdges.concat(tree.edges);
 
-        const coordinates = tree.buildings.map(building => building.geometry.getFirstCoordinate());
+        const coordinates = tree.buildings.map(building => building.coordinates);
         const boundingCoordinates = convexHull(coordinates);
         const boundingPolygon = new Polygon([boundingCoordinates]);
         polygons.push(new Feature(boundingPolygon));
       });
 
       const features = allEdges.map(edge => new Feature({
-        geometry: edge
+        geometry: new LineString(edge)
       }));
 
       networkVectorSource.addFeatures(features);

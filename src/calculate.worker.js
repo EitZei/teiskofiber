@@ -1,19 +1,8 @@
 import Heap from './heap';
-import {
-  LineString
-} from 'ol/geom.js';
 
-let buildingId = 0;
+const line = (a, b) => [a.coordinates, b.coordinates];
 
-const transformBuildings = features => features.map(feature => ({
-  id: buildingId++,
-  noApartments: feature.getProperties()['HUONEISTOJA_KPL'] || 1,
-  geometry: feature.getGeometry()
-}));
-
-const line = (a, b) => new LineString([a.geometry.getFirstCoordinate(), b.geometry.getFirstCoordinate()]);
-
-const weight = (l) => l.getLength();
+const weight = (l) => Math.sqrt(Math.pow(l[0][0] - l[1][0], 2) + Math.pow(l[0][1] - l[1][1], 2));
 
 const density = (length, noApartments) => noApartments / (length / 1000);
 
@@ -31,6 +20,7 @@ const buildHeap = async (buildings, maxLineLength) => {
             from: buildings[i],
             to: buildings[j],
             line: l,
+            length: w,
             weight: w
           });
         }
@@ -59,7 +49,7 @@ const buildTreeIndex = async buildings => {
   return treeIndex;
 }
 
-const mst = async (edgeHeap, treeIndex, targetDensity, progress) => {
+const mst = async (edgeHeap, treeIndex, targetDensity) => {
   const totalEdgeCount = edgeHeap.size();
   while (edgeHeap.size() > 0) {
     const shortestEdge = edgeHeap.pop();
@@ -71,20 +61,15 @@ const mst = async (edgeHeap, treeIndex, targetDensity, progress) => {
       continue;
     }
 
-    const lineBetween = shortestEdge.line;
-
-    const wouldBeTotalLength = fromTree.totalLength + toTree.totalLength + lineBetween.getLength();
+    const wouldBeTotalLength = fromTree.totalLength + toTree.totalLength + shortestEdge.length;
     const wouldBeNoApartments = fromTree.noApartments + toTree.noApartments;
     const wouldBeDensity = density(wouldBeTotalLength, wouldBeNoApartments);
 
-    if (typeof progress === 'function') {
-      if (edgeHeap.size() % 100 === 0) {
-        progress(Promise.resolve({
-          total: totalEdgeCount,
-          remaining: edgeHeap.size()
-        }));
-      }
-    }
+    self.postMessage({
+      status: 'progress',
+      total: totalEdgeCount,
+      remaining: edgeHeap.size()
+    });
 
     // Discard edges as it cannot form a dense enough tree
     if (wouldBeDensity < targetDensity) {
@@ -93,7 +78,7 @@ const mst = async (edgeHeap, treeIndex, targetDensity, progress) => {
 
     fromTree.totalLength = wouldBeTotalLength;
     fromTree.noApartments = wouldBeNoApartments;
-    fromTree.edges.push(lineBetween);
+    fromTree.edges.push(shortestEdge.line);
     fromTree.edges = fromTree.edges.concat(toTree.edges);
     fromTree.buildings = fromTree.buildings.concat(toTree.buildings)
 
@@ -114,26 +99,24 @@ const filterTrees = async (treeIndex, targetNoApartments) => {
   return trees.filter(tree => tree.noApartments >= targetNoApartments);
 }
 
-export const calculate = async ({
-  buildings: inputBuildings,
-  targetDensity,
-  targetNoApartments,
-  maxLineLength,
-  progress
+self.addEventListener('message', async ({
+  data
 }) => {
-  const buildings = await transformBuildings(inputBuildings);
 
-  const edgeHeap = await buildHeap(buildings, maxLineLength);
+  const buildings = data.buildings;
+
+  const edgeHeap = await buildHeap(buildings, data.maxLineLength);
 
   const treeIndex = await buildTreeIndex(buildings);
 
   console.log("Buildings", buildings.length, "Edges", edgeHeap.size(), "Index", treeIndex.length);
 
-  await mst(edgeHeap, treeIndex, targetDensity, progress);
+  await mst(edgeHeap, treeIndex, data.targetDensity);
 
-  const filteredTrees = await filterTrees(treeIndex, targetNoApartments);
+  const filteredTrees = await filterTrees(treeIndex, data.targetNoApartments);
 
-  return {
+  self.postMessage({
+    status: 'done',
     trees: filteredTrees
-  }
-}
+  });
+});

@@ -1,7 +1,15 @@
 import Map from './map';
-import {
-  calculate
-} from './calculate';
+
+import Calculator from './calculate.worker.js';
+
+const transformBuildings = features => {
+  let buildingId = 0;
+  return features.map(feature => ({
+    id: buildingId++,
+    noApartments: feature.getProperties()['HUONEISTOJA_KPL'] || 1,
+    coordinates: feature.getGeometry().getFirstCoordinate()
+  }))
+};
 
 const handleCalculation = map => async () => {
   const targetDensity = document.getElementById('targetDensity').value;
@@ -12,19 +20,26 @@ const handleCalculation = map => async () => {
 
   const buildings = await map.getBuildings();
 
-  const result = await calculate({
-    buildings,
+  const calculator = new Calculator();
+
+  statusLabel.innerHTML = "Lasketaan...";
+
+  calculator.postMessage({
+    buildings: transformBuildings(buildings),
     targetDensity,
     targetNoApartments,
-    maxLineLength,
-    progress: statePromise => statePromise.then(state => {
-      statusLabel.innerHTML = `${state.remaining} / ${state.total}`;
-    })
+    maxLineLength
   });
 
-  statusLabel.innerHTML = ''
-
-  map.drawNetwork(result.trees);
+  calculator.onmessage = (event) => {
+    if (event.data.status === 'progress') {
+      statusLabel.innerHTML = `${event.data.remaining} / ${event.data.total}`;
+    } else {
+      statusLabel.innerHTML = ''
+      map.drawNetwork(event.data.trees);
+      calculator.terminate();
+    }
+  };
 };
 
 window.onload = () => {

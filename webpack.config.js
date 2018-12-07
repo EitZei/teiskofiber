@@ -1,3 +1,4 @@
+const CleanWebpackPlugin = require('clean-webpack-plugin')
 const path = require('path');
 
 module.exports = {
@@ -8,10 +9,25 @@ module.exports = {
   },
   module: {
     rules: [{
-      test: /\.js$/,
-      exclude: /node_modules/,
-      loader: "babel-loader"
-    }]
+        test: /\.js$/,
+        exclude: /node_modules/,
+        loader: "babel-loader"
+      },
+      {
+        test: /\.worker\.js$/,
+        use: {
+          loader: 'worker-loader',
+          options: {
+            name: 'Calculator.[hash].js'
+          }
+        },
+      }
+    ]
   },
-  devtool: 'source-map'
+  devtool: 'source-map',
+  plugins: [
+    new CleanWebpackPlugin(['docs/*.js', 'docs/*.js.map'], {
+      watch: true
+    })
+  ]
 };
