@@ -52,7 +52,8 @@ import {
 } from './geo-utils';
 
 const srs = "EPSG:3067";
-const geoserverUrl = 'http://opendata.navici.com/tampere/ows';
+const rasterServerUrl = 'https://georaster.tampere.fi/geoserver/georaster/wms';
+const geoserverUrl = 'https://geodata.tampere.fi/geoserver/ows';
 
 proj4.defs(srs, "+proj=utm +zone=35 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs");
 register(proj4);
@@ -189,12 +190,12 @@ const buildings = new Promise((resolve) => buildingsPromiseResolve = resolve);
 const fetchBuildings = () => {
   const INTERESTING_TYPES = ['041', '011', '021', '012', '039', '032', '013'];
 
-  const filters = INTERESTING_TYPES.map(type => equalTo('KAYTTOTARKOITUS', type));
+  const filters = INTERESTING_TYPES.map(type => equalTo('C_KAYTTARK', type));
 
   // generate a GetFeature request
   const featureRequest = new WFS().writeGetFeature({
     srsName: srs,
-    featurePrefix: 'opendata',
+    featurePrefix: 'rakennukset',
     featureTypes: ['RAKENNUKSET_MVIEW'],
     outputFormat: 'application/json',
     geometryName: 'GEOLOC',
@@ -230,8 +231,8 @@ const fetchAddresses = (event) => {
   // generate a GetFeature request
   const featureRequest = new WFS().writeGetFeature({
     srsName: srs,
-    featurePrefix: 'opendata',
-    featureTypes: ['ONK_NMR_MVIEW'],
+    featurePrefix: 'osoitteet',
+    featureTypes: ['ONK_NMR_MVIEW_GSVIEW'],
     outputFormat: 'application/json',
     geometryName: 'GEOM',
     bbox: getIntersection(bounds, map.getView().calculateExtent())
@@ -253,7 +254,7 @@ const fetchAddresses = (event) => {
 
 const featureSelected = event => {
   event.selected.forEach(feature => {
-    const type = feature.get('features')[0].getProperties()['KAYTTOTARKOITUS'];
+    const type = feature.get('features')[0].getProperties()['C_KAYTTARK'];
     const noApartments = feature.get('features')[0].getProperties()['HUONEISTOJA_KPL'] || 1;
 
     const specificStyle = buildingStyle[feature.get('features')[0].getGeometry().getType()][type];
@@ -284,7 +285,7 @@ const buildingVectorLayer = new VectorLayer({
 
     if (size === 1) {
       const specificStyle = buildingStyle[feature.get('features')[0].getGeometry().getType()][feature.get('features')[0].getProperties()[
-        'KAYTTOTARKOITUS']];
+        'C_KAYTTARK']];
       return specificStyle || buildingStyle[feature.get('features')[0].getGeometry().getType()].default;
     } else {
       const style = buildingStyle[feature.getGeometry().getType()].cluster;
@@ -326,9 +327,9 @@ const boundingVectorLayer = new VectorLayer({
 const mapLayer = new Tile({
   extent: bounds,
   source: new TileWMS({
-    url: geoserverUrl,
+    url: rasterServerUrl,
     params: {
-      LAYERS: 'opendata:tampere_vkartta_tm35',
+      LAYERS: 'kantakartta_mml_mv_epsg_3067',
       TILED: true,
       CRS: srs,
       STYLES: 'raster'
